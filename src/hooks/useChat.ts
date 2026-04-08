@@ -52,9 +52,25 @@ export const useChat = () => {
       });
       setTyping(true);
 
+      // Auto-create a session if none is active so every conversation is tracked
+      let sessionId = useChatStore.getState().sessionId ?? undefined;
+      if (!sessionId) {
+        try {
+          const { session } = await api.createSession(text);
+          sessionId = session.id;
+          useChatStore.getState().setSessionId(session.id);
+          useChatStore.getState().addSession({
+            id: session.id,
+            title: session.title,
+            createdAt: session.createdAt,
+            messageCount: 0,
+          });
+        } catch { /* fall through without session */ }
+      }
+
       let cards: CardPayload[];
       try {
-        const res = await api.chat(text, history);
+        const res = await api.chat(text, history, sessionId);
         if (!res.cards || res.cards.length === 0) {
           cards = [{ kind: 'error', text: 'AI returned an empty response. Please try again.' }];
         } else {
