@@ -159,7 +159,12 @@ export function TopBar() {
                   onClick={() => handleConnect('okx')}
                   className="w-full h-12 px-4 flex items-center gap-3 rounded-xl bg-[#1A1A1A] hover:bg-[#1F1F1F] border border-[rgba(191,255,0,0.2)] text-[#F5F5F5] text-sm font-semibold transition-colors relative"
                 >
-                  <span className="text-xl">⚫</span>
+                  <img
+                    src="https://static.okx.com/cdn/assets/imgs/247/58E63FEA47A2B7D7.png"
+                    alt="OKX"
+                    className="w-7 h-7 rounded-lg object-contain"
+                    onError={(e) => { (e.target as HTMLImageElement).src = 'https://avatars.githubusercontent.com/u/47748494?s=48'; }}
+                  />
                   <span className="flex-1 text-left">OKX Wallet</span>
                   <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[rgba(191,255,0,0.1)] text-[#BFFF00]">
                     Recommended
@@ -169,14 +174,22 @@ export function TopBar() {
                   onClick={() => handleConnect('metamask')}
                   className="w-full h-12 px-4 flex items-center gap-3 rounded-xl bg-[#1A1A1A] hover:bg-[#1F1F1F] border border-[rgba(255,255,255,0.08)] text-[#F5F5F5] text-sm font-semibold transition-colors"
                 >
-                  <span className="text-xl">🦊</span>
+                  <img
+                    src="https://raw.githubusercontent.com/MetaMask/metamask-extension/main/app/images/icon-128.png"
+                    alt="MetaMask"
+                    className="w-7 h-7 rounded-lg object-contain"
+                  />
                   <span className="flex-1 text-left">MetaMask</span>
                 </button>
                 <button
                   onClick={() => handleConnect('walletconnect')}
                   className="w-full h-12 px-4 flex items-center gap-3 rounded-xl bg-[#1A1A1A] hover:bg-[#1F1F1F] border border-[rgba(255,255,255,0.08)] text-[#F5F5F5] text-sm font-semibold transition-colors"
                 >
-                  <span className="text-xl">🔗</span>
+                  <img
+                    src="https://avatars.githubusercontent.com/u/37784886?s=48&v=4"
+                    alt="WalletConnect"
+                    className="w-7 h-7 rounded-lg object-contain"
+                  />
                   <span className="flex-1 text-left">WalletConnect</span>
                 </button>
                 <div className="h-px bg-[rgba(255,255,255,0.06)] my-1" />
@@ -184,7 +197,9 @@ export function TopBar() {
                   onClick={() => handleConnect('demo')}
                   className="w-full h-12 px-4 flex items-center gap-3 rounded-xl bg-[#1A1A1A] hover:bg-[#1F1F1F] border border-[rgba(255,255,255,0.08)] text-[#A3A3A3] text-sm font-semibold transition-colors"
                 >
-                  <span className="text-xl">⚡</span>
+                  <div className="w-7 h-7 rounded-lg bg-[#2A2A2A] flex items-center justify-center text-[#BFFF00]">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                  </div>
                   <span className="flex-1 text-left">Demo wallet</span>
                   <span className="text-[9px] uppercase tracking-wider text-[#666]">read-only</span>
                 </button>
