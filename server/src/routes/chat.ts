@@ -4,7 +4,6 @@ import { getWalletBalances, OnchainOsError } from '../services/onchainos.js';
 import { getAllTrackedTokens } from '../services/tokenTracker.js';
 import { getAllPools } from '../services/poolTracker.js';
 import { listStrategies } from '../services/strategyEngine.js';
-import { getMezoPools } from '../services/mezoService.js';
 import { env } from '../config/env.js';
 import {
   getHistory, appendMessages, clearHistory,
@@ -166,22 +165,10 @@ async function buildContextBlock(): Promise<string> {
     }
   }
 
-  // Mezo Protocol pools
-  const mezoPools = getMezoPools();
-  lines.push('');
-  lines.push('[MEZO PROTOCOL — Bitcoin-backed MUSD stablecoin (testnet chainId 31611)]');
-  lines.push('MUSD: borrow against BTC collateral | min 1800 MUSD | fee 1-5% | min CR 110% | safe CR 150%+');
-  lines.push('MUSD yield pools (AMM on Mezo chain):');
-  for (const p of mezoPools) {
-    lines.push(`- ${p.pair}: ~${p.aprPct.toFixed(1)}% APR | ${p.note}`);
-  }
-  lines.push('Borrow MUSD at: https://mezo.org/feature/borrow');
-
   // Network meta
   lines.push('');
   lines.push('[NETWORK]');
-  lines.push('Primary: X Layer Mainnet (chain id 196), gas token OKB, USDT/USDG transfers are gas-sponsored.');
-  lines.push('Secondary: Mezo Testnet (chain id 31611), BTC collateral, MUSD stablecoin.');
+  lines.push('X Layer Mainnet (chain id 196), gas token OKB, USDT/USDG transfers are gas-sponsored.');
 
   return lines.join('\n');
 }

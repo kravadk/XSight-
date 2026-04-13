@@ -119,22 +119,6 @@ export const TOKEN_META: Record<string, TokenMeta> = {
     letter: 'G',
     decimals: 18,
   },
-  MUSD: {
-    symbol: 'MUSD',
-    name: 'Mezo USD',
-    color: '#F97316',
-    letter: 'M',
-    decimals: 18,
-    logo: 'https://mezo.org/favicon.ico',
-  },
-  tBTC: {
-    symbol: 'tBTC',
-    name: 'Threshold BTC',
-    color: '#F7931A',
-    letter: 'B',
-    decimals: 18,
-    logo: 'https://assets.coingecko.com/coins/images/11224/small/0x18084fba666a33d37592fa2633fd49a74dd93a88.png',
-  },
 };
 
 export function tokenMeta(symbol: string): TokenMeta {

@@ -26,9 +26,4 @@ export type CardPayload =
       toAmount: number;
       hash: string;
     }
-  | { kind: 'error'; text: string }
-  | {
-      kind: 'mezoTrove';
-      /** Wallet address to look up on Mezo chain */
-      address: string;
-    };
+  | { kind: 'error'; text: string };

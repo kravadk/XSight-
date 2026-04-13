@@ -161,74 +161,6 @@ export interface StrategyCreateBody {
   label?: string;
 }
 
-// ─── Mezo Protocol DTOs ───────────────────────────────────────────────────
-
-export interface MezoTrovePosition {
-  address: string;
-  status: string;
-  statusCode: number;
-  debtMusd: number;
-  netDebtMusd: number;
-  collBtc: number;
-  btcPriceUsd: number;
-  collValueUsd: number;
-  collateralRatio: number;
-  health: 'safe' | 'warning' | 'danger' | 'liquidatable';
-  explorerUrl: string;
-}
-
-export interface MezoTroveDto {
-  trove: MezoTrovePosition;
-  network: string;
-  chainId: number;
-}
-
-export interface MezoPriceDto {
-  btcPriceUsd: number;
-  fetchedAt: number;
-  source: string;
-  network: string;
-}
-
-export interface MezoPoolDto {
-  pair: string;
-  address: string;
-  aprPct: number;
-  note: string;
-}
-
-export interface MezoPoolsDto {
-  pools: MezoPoolDto[];
-  network: string;
-  chainId: number;
-  note: string;
-}
-
-export interface MezoBorrowEstimate {
-  collBtc: number;
-  btcPriceUsd: number;
-  collValueUsd: number;
-  maxMusd: number;
-  safeMusd: number;
-  feeMusd: number;
-  totalDebt: number;
-  collateralRatio: number;
-  liquidationPriceUsd: number;
-  minBorrow: number;
-  gasCompensation: number;
-}
-
-export interface MezoEstimateDto {
-  estimate: MezoBorrowEstimate;
-  guidance: {
-    minBorrow: number;
-    gasCompensation: number;
-    safeRatio: number;
-    borrowUrl: string;
-    contracts: { BorrowerOperations: string; TroveManager: string };
-  };
-}
-
 export interface SwapResultDto {
   txHash: string;
   approveTxHash?: string;
@@ -374,17 +306,6 @@ export const api = {
     ),
   resolveToken: (input: string) =>
     request<CatalogTokenDto>(`/market/catalog/resolve?input=${encodeURIComponent(input)}`),
-
-  // Mezo Protocol
-  mezoTrove: (address: string) =>
-    request<MezoTroveDto>(`/mezo/trove/${encodeURIComponent(address)}`),
-  mezoPrice: () => request<MezoPriceDto>('/mezo/price'),
-  mezoPools: () => request<MezoPoolsDto>('/mezo/pools'),
-  mezoEstimate: (collBtc: number, musd?: number) =>
-    request<MezoEstimateDto>(
-      `/mezo/estimate?coll=${collBtc}${musd !== undefined ? `&musd=${musd}` : ''}`,
-    ),
-  mezoInfo: () => request<unknown>('/mezo/info'),
 
   x402Spec: () => request<unknown>('/v1/x402-spec'),
 

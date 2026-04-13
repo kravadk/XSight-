@@ -6,7 +6,6 @@ import { TxSuccessCard } from './TxSuccessCard';
 import { PortfolioCard } from './PortfolioCard';
 import { RiskCard } from './RiskCard';
 import { YieldCard } from './YieldCard';
-import { MezoTroveCard } from './MezoTroveCard';
 import { RichText } from '../common/RichText';
 import { AlertTriangle } from 'lucide-react';
 
@@ -59,8 +58,6 @@ export function ChatCard({ card }: { card: CardPayload }) {
           hash={card.hash}
         />
       );
-    case 'mezoTrove':
-      return <MezoTroveCard address={card.address} />;
     case 'error':
       return (
         <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] text-[#EF4444] text-sm">
