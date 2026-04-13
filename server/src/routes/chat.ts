@@ -4,6 +4,7 @@ import { getWalletBalances, OnchainOsError } from '../services/onchainos.js';
 import { getAllTrackedTokens } from '../services/tokenTracker.js';
 import { getAllPools } from '../services/poolTracker.js';
 import { listStrategies } from '../services/strategyEngine.js';
+import { getMezoPools } from '../services/mezoService.js';
 import { env } from '../config/env.js';
 import {
   getHistory, appendMessages, clearHistory,
@@ -163,6 +164,19 @@ async function buildContextBlock(): Promise<string> {
         `- ${s.kind}: ${s.description} (status: ${s.firedCount > 0 ? `fired ${s.firedCount}×` : 'armed'})`,
       );
     }
+  }
+
+  // Mezo Protocol pools
+  lines.push('');
+  lines.push('[MEZO PROTOCOL — MUSD Liquidity Pools on Mezo Testnet (chainId 31611)]');
+  try {
+    const mezoPools = getMezoPools();
+    for (const p of mezoPools) {
+      lines.push(`- ${p.pair}: APR ${p.aprPct.toFixed(1)}% | ${p.description}`);
+    }
+    lines.push('Mezo facts: BTC collateral → borrow MUSD | min CR 110% | safe CR 150% | borrow fee 0.5–5% | min borrow 1,800 MUSD');
+  } catch {
+    lines.push('(Mezo pool data unavailable)');
   }
 
   // Network meta

@@ -12,6 +12,7 @@ import { startTokenTracker } from './services/tokenTracker.js';
 import { startPoolTracker } from './services/poolTracker.js';
 import { startStrategyEngine } from './services/strategyEngine.js';
 import { startTokenCatalog } from './services/tokenCatalog.js';
+import { mezoRouter } from './routes/mezo.js';
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/economy', economyRouter); // spec-aliased shim, see routes/economy
 app.use('/api/market', marketRouter);
 app.use('/api/strategies', strategyRouter);
 app.use('/api/v1', analysisRouter);
+app.use('/api/mezo', mezoRouter);
 
 // Background data trackers + automation engine
 startTokenCatalog(); // must run before swap routes resolve

@@ -197,6 +197,61 @@ export interface SessionMeta {
   messageCount: number;
 }
 
+// ── Mezo Protocol types ────────────────────────────────────────────────────────
+
+export interface MezoTroveDto {
+  address: string;
+  status: string;
+  statusCode: number;
+  debtMusd: number;
+  netDebtMusd: number;
+  collBtc: number;
+  btcPriceUsd: number;
+  collValueUsd: number;
+  collateralRatio: number;
+  health: 'safe' | 'warning' | 'danger' | 'liquidatable';
+  liquidationPriceUsd: number;
+  explorerUrl: string;
+  network: string;
+  chainId: number;
+}
+
+export interface MezoPriceDto {
+  btcPriceUsd: number;
+  network: string;
+  chainId: number;
+}
+
+export interface MezoPoolDto {
+  name: string;
+  pair: string;
+  address: string;
+  aprPct: number;
+  description: string;
+}
+
+export interface MezoPoolsDto {
+  pools: MezoPoolDto[];
+  network: string;
+  chainId: number;
+}
+
+export interface MezoBorrowEstimateDto {
+  collBtc: number;
+  collValueUsd: number;
+  btcPriceUsd: number;
+  requestedMusd: number;
+  maxMusd: number;
+  collateralRatio: number;
+  borrowFeePct: number;
+  borrowFeeMusd: number;
+  netDebtMusd: number;
+  liquidationPriceUsd: number;
+  health: 'safe' | 'warning' | 'danger' | 'liquidatable';
+  feasible: boolean;
+  reason?: string;
+}
+
 export class ApiError extends Error {
   status: number;
   detail?: string;
@@ -327,4 +382,19 @@ export const api = {
   deleteStrategy: (id: string) =>
     request<{ ok: true }>(`/strategies/${id}`, { method: 'DELETE' }),
   strategyFires: () => request<{ fires: StrategyFireDto[] }>('/strategies/fires'),
+
+  // Mezo Protocol
+  mezoTrove: (address: string) =>
+    request<MezoTroveDto>(`/mezo/trove/${encodeURIComponent(address)}`),
+
+  mezoPrice: () =>
+    request<MezoPriceDto>('/mezo/price'),
+
+  mezoPools: () =>
+    request<MezoPoolsDto>('/mezo/pools'),
+
+  mezoEstimate: (coll: number, musd?: number) =>
+    request<MezoBorrowEstimateDto>(
+      `/mezo/estimate?coll=${coll}${musd !== undefined ? `&musd=${musd}` : ''}`,
+    ),
 };
