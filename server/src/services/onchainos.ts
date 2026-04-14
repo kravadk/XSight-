@@ -386,15 +386,15 @@ async function fetchSwapTx(params: {
   userAddress: string;
 }): Promise<OkxSwapResponse> {
   // OKX v6 DEX aggregator REQUIRES `slippagePercent` (NOT `slippage`).
-  // "slippagePercent=1" means 1% tolerance. Using 3% for X Layer pools
-  // which have limited liquidity — keeps minAmountOut loose enough to land.
+  // "slippagePercent=5" means 5% tolerance. X Layer pools have limited
+  // liquidity — wider slippage keeps minAmountOut loose enough to land.
   const path =
     `/api/v6/dex/aggregator/swap?chainIndex=${params.chainId}` +
     `&fromTokenAddress=${params.fromToken}` +
     `&toTokenAddress=${params.toToken}` +
     `&amount=${params.amount}` +
     `&userWalletAddress=${params.userAddress}` +
-    `&slippagePercent=3`;
+    `&slippagePercent=5`;
   console.log(`[fetchSwapTx] → ${path.slice(0, 180)}`);
   const res = await okxGet<OkxEnvelope<OkxSwapResponse[]>>(path);
   if (res.code && res.code !== '0') {
@@ -566,70 +566,91 @@ export async function executeSwap(params: {
     }
   }
 
-  const swap = await fetchSwapTx({
-    fromToken: params.fromToken,
-    toToken: params.toToken,
-    amount: params.amount,
-    chainId,
-    userAddress: signer.address,
-  });
+  // Fetch calldata + broadcast with one automatic retry on revert.
+  // On-chain reverts are usually caused by stale routing data (minAmountOut
+  // check fails because price moved between quote and execution). Fetching
+  // fresh calldata and retrying immediately resolves this in most cases.
+  let lastRevertError: OnchainOsError | null = null;
 
-  // Defensive: fetchSwapTx already validates, but double-check before broadcast
-  if (!swap.tx.data || swap.tx.data === '0x') {
-    throw new OnchainOsError('refusing to broadcast swap tx with empty calldata');
-  }
-  if (!swap.tx.to || !/^0x[0-9a-fA-F]{40}$/.test(swap.tx.to)) {
-    throw new OnchainOsError(`swap tx has invalid to address: ${swap.tx.to}`);
-  }
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const swap = await fetchSwapTx({
+      fromToken: params.fromToken,
+      toToken: params.toToken,
+      amount: params.amount,
+      chainId,
+      userAddress: signer.address,
+    });
 
-  console.log(
-    `[executeSwap] broadcasting swap to=${swap.tx.to} value=${swap.tx.value} ` +
-    `gas=${swap.tx.gas} gasPrice=${swap.tx.gasPrice} ` +
-    `minReceive=${swap.tx.minReceiveAmount ?? 'n/a'} ` +
-    `calldata_len=${swap.tx.data.length}`,
-  );
+    if (!swap.tx.data || swap.tx.data === '0x') {
+      throw new OnchainOsError('refusing to broadcast swap tx with empty calldata');
+    }
+    if (!swap.tx.to || !/^0x[0-9a-fA-F]{40}$/.test(swap.tx.to)) {
+      throw new OnchainOsError(`swap tx has invalid to address: ${swap.tx.to}`);
+    }
 
-  const swapTx = await signer.sendTransaction({
-    to: swap.tx.to,
-    data: swap.tx.data,
-    value: BigInt(swap.tx.value || '0'),
-    gasLimit: swap.tx.gas ? BigInt(swap.tx.gas) : undefined,
-    gasPrice: swap.tx.gasPrice ? BigInt(swap.tx.gasPrice) : undefined,
-  });
-
-  let receipt;
-  try {
-    receipt = await swapTx.wait();
-  } catch (err: unknown) {
-    throw wrapCallException(err, swapTx.hash, 'swap');
-  }
-
-  if (!receipt || receipt.status !== 1) {
-    throw new OnchainOsError(
-      `Swap reverted on-chain (status=0, gasUsed=${receipt ? String(receipt.gasUsed) : '?'}, tx=${swapTx.hash}). ` +
-      `Likely cause: slippage exceeded or stale routing data. Try again.`,
+    console.log(
+      `[executeSwap] attempt ${attempt}/2 — to=${swap.tx.to} value=${swap.tx.value} ` +
+      `gas=${swap.tx.gas} gasPrice=${swap.tx.gasPrice} ` +
+      `minReceive=${swap.tx.minReceiveAmount ?? 'n/a'} ` +
+      `calldata_len=${swap.tx.data.length}`,
     );
+
+    const swapTx = await signer.sendTransaction({
+      to: swap.tx.to,
+      data: swap.tx.data,
+      value: BigInt(swap.tx.value || '0'),
+      gasLimit: swap.tx.gas ? BigInt(swap.tx.gas) : undefined,
+      gasPrice: swap.tx.gasPrice ? BigInt(swap.tx.gasPrice) : undefined,
+    });
+
+    let receipt;
+    try {
+      receipt = await swapTx.wait();
+    } catch (err: unknown) {
+      lastRevertError = wrapCallException(err, swapTx.hash, 'swap');
+      console.warn(`[executeSwap] attempt ${attempt} reverted:`, lastRevertError.message);
+      if (attempt < 2) {
+        await sleep(1500); // brief pause before retry with fresh calldata
+        continue;
+      }
+      throw lastRevertError;
+    }
+
+    if (!receipt || receipt.status !== 1) {
+      lastRevertError = new OnchainOsError(
+        `Swap reverted (attempt ${attempt}, gasUsed=${receipt ? String(receipt.gasUsed) : '?'}, tx=${swapTx.hash}). ` +
+        `Slippage exceeded or stale routing data.`,
+      );
+      console.warn(`[executeSwap] attempt ${attempt} status=0:`, lastRevertError.message);
+      if (attempt < 2) {
+        await sleep(1500);
+        continue;
+      }
+      throw lastRevertError;
+    }
+
+    // Success
+    try {
+      const gasFee = receipt.gasUsed * receipt.gasPrice;
+      recordGasSpend(Number(gasFee) / 1e18);
+    } catch (err) {
+      console.warn('[executeSwap] failed to record swap gas:', err instanceof Error ? err.message : err);
+    }
+    recordActivity('dex.swap', `${params.fromSymbol}->${params.toSymbol} ${swapTx.hash}`);
+
+    return {
+      txHash: swapTx.hash,
+      approveTxHash,
+      fromSymbol: params.fromSymbol,
+      toSymbol: params.toSymbol,
+      fromAmount: Number(params.amount),
+      toAmount: Number(swap.routerResult?.toTokenAmount ?? 0),
+      status: 'confirmed',
+    };
   }
 
-  const status: 'submitted' | 'confirmed' = 'confirmed';
-
-  try {
-    const gasFee = receipt.gasUsed * receipt.gasPrice;
-    recordGasSpend(Number(gasFee) / 1e18);
-  } catch (err) {
-    console.warn('[executeSwap] failed to record swap gas:', err instanceof Error ? err.message : err);
-  }
-  recordActivity('dex.swap', `${params.fromSymbol}->${params.toSymbol} ${swapTx.hash}`);
-
-  return {
-    txHash: swapTx.hash,
-    approveTxHash,
-    fromSymbol: params.fromSymbol,
-    toSymbol: params.toSymbol,
-    fromAmount: Number(params.amount),
-    toAmount: Number(swap.routerResult?.toTokenAmount ?? 0),
-    status,
-  };
+  // Should be unreachable, but TypeScript needs this
+  throw lastRevertError ?? new OnchainOsError('swap failed after retries');
 }
 
 export async function getTokenSecurity(
