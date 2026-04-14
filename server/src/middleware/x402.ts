@@ -68,7 +68,7 @@ export function withX402(opts: X402Options) {
       return;
     }
 
-    if (header === 'dev-bypass' && env.nodeEnv !== 'production') {
+    if (header === 'dev-bypass' && (env.nodeEnv !== 'production' || env.allowDevBypass)) {
       logCall({
         timestamp: Date.now(),
         endpoint,

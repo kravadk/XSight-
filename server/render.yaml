@@ -37,3 +37,5 @@ services:
         value: xlayer-mainnet
       - key: X402_ASSET
         value: USDT
+      - key: ALLOW_DEV_BYPASS
+        value: true
