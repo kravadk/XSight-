@@ -60,6 +60,7 @@ export function EndpointCard({ method, path, price, description, params = [] }: 
   const [lang, setLang] = useState<Lang>('curl');
   const [copied, setCopied] = useState(false);
   const [running, setRunning] = useState(false);
+  const [probing, setProbing] = useState(false);
   const [log, setLog] = useState<LogLine[] | null>(null);
 
   const fullUrl = useMemo(() => `${BASE_URL}${path}${buildQuery(params, values)}`, [path, params, values]);
@@ -74,6 +75,36 @@ export function EndpointCard({ method, path, price, description, params = [] }: 
       },
       () => toast.error('Copy failed'),
     );
+  };
+
+  /** Fire without any payment header to demonstrate the 402 gate. */
+  const probe402 = async () => {
+    setProbing(true);
+    const lines: LogLine[] = [
+      { ts: Date.now(), prefix: '$', text: `${method} ${path}${buildQuery(params, values)}`, level: 'cmd' },
+      { ts: Date.now(), text: '> (no X-PAYMENT header)', level: 'info' },
+    ];
+    setLog([...lines]);
+    try {
+      const t0 = performance.now();
+      const res = await fetch(`/api/v1${path}${buildQuery(params, values)}`, { method });
+      const dt = Math.round(performance.now() - t0);
+      const text = await res.text();
+      lines.push({
+        ts: Date.now(),
+        text: `< ${res.status} ${res.statusText} (${dt}ms)`,
+        level: res.status === 402 ? 'error' : 'success',
+      });
+      let pretty = text;
+      try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch { /* */ }
+      lines.push({ ts: Date.now(), text: pretty.slice(0, 1000), level: 'info' });
+      setLog([...lines]);
+    } catch (err) {
+      lines.push({ ts: Date.now(), text: `! ${err instanceof Error ? err.message : 'failed'}`, level: 'error' });
+      setLog([...lines]);
+    } finally {
+      setProbing(false);
+    }
   };
 
   const run = async () => {
@@ -198,8 +229,16 @@ export function EndpointCard({ method, path, price, description, params = [] }: 
 
       <div className="flex gap-2">
         <button
+          onClick={probe402}
+          disabled={probing || running}
+          title="Send without payment — shows the 402 Payment Required gate"
+          className="h-9 px-3 flex items-center gap-1.5 text-[11px] font-bold text-[#EF4444] bg-[rgba(239,68,68,0.08)] hover:bg-[rgba(239,68,68,0.15)] border border-[rgba(239,68,68,0.2)] rounded-lg transition-colors disabled:opacity-50 shrink-0"
+        >
+          {probing ? '…' : '→ 402'}
+        </button>
+        <button
           onClick={run}
-          disabled={running}
+          disabled={running || probing}
           className="flex-1 h-9 flex items-center justify-center gap-1.5 text-xs font-bold text-[#0A0A0A] bg-[#BFFF00] hover:bg-[#D4FF33] rounded-lg transition-colors disabled:opacity-60"
         >
           {running ? 'Calling...' : 'Send request'} <ArrowRight className="w-3 h-3" />
