@@ -3,7 +3,7 @@ import { Sparkles, ArrowDownUp, RefreshCw, Loader2 } from 'lucide-react';
 import { useSwap } from '../../hooks/useSwap';
 import { tokenMeta } from '../../config/tokens';
 import { TokenIcon } from '../common/TokenIcon';
-import { getSwapQuote, fromRawAmount } from '../../services/okxDex';
+import { getSwapQuote } from '../../services/okxDex';
 import type { OkxQuote } from '../../services/okxDex';
 
 interface Props {
@@ -20,6 +20,7 @@ export function SwapPreviewCard({ fromSymbol, toSymbol, fromAmount, toAmount }: 
 
   const [cancelled,   setCancelled]   = useState(false);
   const [executing,   setExecuting]   = useState(false);
+  const [done,        setDone]        = useState(false);
   const [quote,        setQuote]        = useState<OkxQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(true);
   const [quoteError,   setQuoteError]   = useState<string | null>(null);
@@ -45,7 +46,8 @@ export function SwapPreviewCard({ fromSymbol, toSymbol, fromAmount, toAmount }: 
     finally { setQuoteLoading(false); }
   };
 
-  const realToAmount = quote ? fromRawAmount(quote.toAmount, toMeta.decimals) : toAmount;
+  // quote.toAmount is already human-readable (backend converts to decimal before sending)
+  const realToAmount = quote ? Number(quote.toAmount) : toAmount;
   const displayToAmount = quoteLoading
     ? '…'
     : realToAmount.toLocaleString(undefined, { maximumFractionDigits: 6 });
@@ -59,7 +61,17 @@ export function SwapPreviewCard({ fromSymbol, toSymbol, fromAmount, toAmount }: 
     setExecuting(true);
     await execute(fromSymbol, toSymbol, fromAmount, realToAmount);
     setExecuting(false);
+    setDone(true);
   };
+
+  if (done) {
+    return (
+      <div className="bg-[#151515] rounded-2xl border border-[rgba(191,255,0,0.15)] p-4 mt-1 w-full max-w-[360px] flex items-center gap-2 text-xs text-[#BFFF00]">
+        <span className="text-base">✓</span>
+        <span className="font-semibold">Swap submitted — see result below</span>
+      </div>
+    );
+  }
 
   if (cancelled) {
     return (
