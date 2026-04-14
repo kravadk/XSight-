@@ -8,3 +8,5 @@ dist-ssr
 .env
 .env.local
 *.tsbuildinfo
+# Runtime data — never commit
+data/
