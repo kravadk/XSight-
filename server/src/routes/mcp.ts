@@ -11,7 +11,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import { getWalletBalances, getTrendingTokens, getTokenSecurity, OnchainOsError } from '../services/onchainos.js';
+import { getWalletBalances, getTokenSecurity, OnchainOsError } from '../services/onchainos.js';
 import { getAllTrackedTokens } from '../services/tokenTracker.js';
 import { getAllPools } from '../services/poolTracker.js';
 import { snapshot } from '../services/economyLoop.js';
