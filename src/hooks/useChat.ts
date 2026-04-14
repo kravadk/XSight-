@@ -72,6 +72,11 @@ export const useChat = () => {
         } catch { /* fall through without session */ }
       }
 
+      // Capture the sessionId that was active when this request started.
+      // If the user switches sessions while the AI is responding, we must
+      // not inject the response into the newly-selected session.
+      const requestSessionId = sessionId;
+
       let cards: CardPayload[];
       try {
         const res = await api.chat(text, history, sessionId);
@@ -88,7 +93,13 @@ export const useChat = () => {
               ? err.message
               : 'unknown error';
         cards = [{ kind: 'error', text: `Connection error: ${detail}` }];
+      } finally {
+        setTyping(false);
       }
+
+      // Only commit if the user is still in the same session — prevents
+      // a response from a stale request appearing in a different session.
+      if (useChatStore.getState().sessionId !== requestSessionId) return;
 
       addMessage({
         id: nextId(),
@@ -98,18 +109,16 @@ export const useChat = () => {
       });
 
       // Refresh session meta after first turn so AI-generated title is reflected
-      if (sessionId) {
+      if (requestSessionId) {
         const { sessions } = useChatStore.getState();
-        const sess = sessions.find(s => s.id === sessionId);
+        const sess = sessions.find(s => s.id === requestSessionId);
         if (sess && sess.messageCount <= 1) {
           api.listSessions().then(({ sessions: list }) => {
-            const updated = list.find(s => s.id === sessionId);
-            if (updated) useChatStore.getState().updateSession(sessionId, { title: updated.title, messageCount: updated.messageCount });
+            const updated = list.find(s => s.id === requestSessionId);
+            if (updated) useChatStore.getState().updateSession(requestSessionId, { title: updated.title, messageCount: updated.messageCount });
           }).catch(() => {});
         }
       }
-
-      setTyping(false);
     },
     [addMessage, setTyping],
   );

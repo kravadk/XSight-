@@ -21,16 +21,15 @@ export function SwapPreviewCard({ fromSymbol, toSymbol, fromAmount, toAmount }: 
   const [cancelled,   setCancelled]   = useState(false);
   const [executing,   setExecuting]   = useState(false);
   const [done,        setDone]        = useState(false);
+  const executingRef = useRef(false); // synchronous guard against double-clicks
   const [quote,        setQuote]        = useState<OkxQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(true);
   const [quoteError,   setQuoteError]   = useState<string | null>(null);
 
-  const hasFetched = useRef(false);
-
   useEffect(() => {
-    if (hasFetched.current) return;
-    hasFetched.current = true;
     let alive = true;
+    setQuoteLoading(true);
+    setQuoteError(null);
     getSwapQuote(fromSymbol, toSymbol, fromAmount)
       .then((q) => { if (alive) setQuote(q); })
       .catch((err) => { if (alive) setQuoteError(err instanceof Error ? err.message : 'Quote failed'); })
@@ -57,11 +56,16 @@ export function SwapPreviewCard({ fromSymbol, toSymbol, fromAmount, toAmount }: 
     : null;
 
   const onExecute = async () => {
-    if (executing || quoteLoading || quoteError) return;
+    if (executingRef.current || quoteLoading || quoteError) return;
+    executingRef.current = true;
     setExecuting(true);
-    await execute(fromSymbol, toSymbol, fromAmount, realToAmount);
-    setExecuting(false);
-    setDone(true);
+    try {
+      await execute(fromSymbol, toSymbol, fromAmount, realToAmount);
+      setDone(true);
+    } finally {
+      executingRef.current = false;
+      setExecuting(false);
+    }
   };
 
   if (done) {

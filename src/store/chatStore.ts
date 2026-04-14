@@ -44,5 +44,5 @@ export const useChatStore = create<ChatState>((set) => ({
     set((st) => ({
       sessions: st.sessions.map(s => s.id === id ? { ...s, ...updates } : s),
     })),
-  clear: () => set({ messages: [] }),
+  clear: () => set({ messages: [], sessionId: null }),
 }));

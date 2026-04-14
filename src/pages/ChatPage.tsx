@@ -54,12 +54,14 @@ export function ChatPage() {
   const handleSelectSession = useCallback(async (id: string) => {
     if (id === sessionId) return;
     setSessionId(id);
-    clear();
     try {
+      // Load first, then replace — avoids blank flash between clear() and loadMessages()
       const { messages: msgs } = await api.loadSession(id);
-      if (msgs.length) loadMessages(msgs);
-    } catch { /* ignore */ }
-  }, [sessionId, setSessionId, clear, loadMessages]);
+      loadMessages(msgs.length ? msgs : []);
+    } catch {
+      loadMessages([]);
+    }
+  }, [sessionId, setSessionId, loadMessages]);
 
   const handleDeleteSession = useCallback(async (_e: React.MouseEvent, id: string) => {
     try {
