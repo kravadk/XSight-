@@ -386,16 +386,16 @@ async function fetchSwapTx(params: {
   userAddress: string;
 }): Promise<OkxSwapResponse> {
   // OKX v6 DEX aggregator REQUIRES `slippagePercent` (NOT `slippage`).
-  // Verified live: `slippage=0.005` returns 400 "Parameter slippagePercent
-  // cannot be empty". Format is a decimal percent string in [0..1] — 0.5 means
-  // 0.5%. We pass 0.5 (one tenth of a percent over the quote impact range).
+  // "slippagePercent=1" means 1% tolerance. Using 3% for X Layer pools
+  // which have limited liquidity — keeps minAmountOut loose enough to land.
   const path =
     `/api/v6/dex/aggregator/swap?chainIndex=${params.chainId}` +
     `&fromTokenAddress=${params.fromToken}` +
     `&toTokenAddress=${params.toToken}` +
     `&amount=${params.amount}` +
     `&userWalletAddress=${params.userAddress}` +
-    `&slippagePercent=0.5`;
+    `&slippagePercent=3`;
+  console.log(`[fetchSwapTx] → ${path.slice(0, 180)}`);
   const res = await okxGet<OkxEnvelope<OkxSwapResponse[]>>(path);
   if (res.code && res.code !== '0') {
     throw new OnchainOsError(`okx swap code=${res.code} msg=${res.msg}`);
@@ -464,6 +464,32 @@ function isNativeToken(addr: string): boolean {
   return addr.toLowerCase() === NATIVE_TOKEN_ADDRESS.toLowerCase();
 }
 
+/**
+ * ethers v6 throws CALL_EXCEPTION (instead of returning receipt with status=0)
+ * when a transaction is mined but reverts. Wrap it in OnchainOsError so the
+ * swap route returns a clean 503 with a user-readable message instead of a 500
+ * with the raw ethers error blob.
+ */
+function wrapCallException(err: unknown, txHash: string, phase: 'approve' | 'swap'): OnchainOsError {
+  if (
+    err &&
+    typeof err === 'object' &&
+    'code' in err &&
+    (err as { code: string }).code === 'CALL_EXCEPTION'
+  ) {
+    const e = err as { receipt?: { gasUsed?: unknown }; code: string };
+    const used = e.receipt?.gasUsed != null ? String(e.receipt.gasUsed) : '?';
+    return new OnchainOsError(
+      `${phase === 'swap' ? 'Swap' : 'Approve'} reverted on-chain ` +
+      `(gasUsed=${used}, tx=${txHash}). ` +
+      `Likely cause: slippage exceeded or stale routing data — please try again.`,
+    );
+  }
+  // Not a call exception — re-throw as-is after wrapping
+  const msg = err instanceof Error ? err.message : String(err);
+  return new OnchainOsError(`${phase} tx failed: ${msg}`);
+}
+
 export async function executeSwap(params: {
   fromToken: string;
   toToken: string;
@@ -519,14 +545,19 @@ export async function executeSwap(params: {
         gasLimit: approveInfo.gasLimit ? BigInt(approveInfo.gasLimit) : undefined,
         gasPrice: approveInfo.gasPrice ? BigInt(approveInfo.gasPrice) : undefined,
       });
-      const receipt = await approveTx.wait();
-      if (!receipt || receipt.status !== 1) {
+      let approveReceipt;
+      try {
+        approveReceipt = await approveTx.wait();
+      } catch (err: unknown) {
+        throw wrapCallException(err, approveTx.hash, 'approve');
+      }
+      if (!approveReceipt || approveReceipt.status !== 1) {
         throw new OnchainOsError(`approve transaction failed: ${approveTx.hash}`);
       }
       approveTxHash = approveTx.hash;
       // Record real gas spend in OKB (X Layer native gas token)
       try {
-        const gasFee = receipt.gasUsed * receipt.gasPrice;
+        const gasFee = approveReceipt.gasUsed * approveReceipt.gasPrice;
         recordGasSpend(Number(gasFee) / 1e18);
       } catch (err) {
         console.warn('[executeSwap] failed to record approve gas:', err instanceof Error ? err.message : err);
@@ -551,6 +582,13 @@ export async function executeSwap(params: {
     throw new OnchainOsError(`swap tx has invalid to address: ${swap.tx.to}`);
   }
 
+  console.log(
+    `[executeSwap] broadcasting swap to=${swap.tx.to} value=${swap.tx.value} ` +
+    `gas=${swap.tx.gas} gasPrice=${swap.tx.gasPrice} ` +
+    `minReceive=${swap.tx.minReceiveAmount ?? 'n/a'} ` +
+    `calldata_len=${swap.tx.data.length}`,
+  );
+
   const swapTx = await signer.sendTransaction({
     to: swap.tx.to,
     data: swap.tx.data,
@@ -559,16 +597,27 @@ export async function executeSwap(params: {
     gasPrice: swap.tx.gasPrice ? BigInt(swap.tx.gasPrice) : undefined,
   });
 
-  const receipt = await swapTx.wait();
-  const status: 'submitted' | 'confirmed' = receipt && receipt.status === 1 ? 'confirmed' : 'submitted';
+  let receipt;
+  try {
+    receipt = await swapTx.wait();
+  } catch (err: unknown) {
+    throw wrapCallException(err, swapTx.hash, 'swap');
+  }
 
-  if (receipt) {
-    try {
-      const gasFee = receipt.gasUsed * receipt.gasPrice;
-      recordGasSpend(Number(gasFee) / 1e18);
-    } catch (err) {
-      console.warn('[executeSwap] failed to record swap gas:', err instanceof Error ? err.message : err);
-    }
+  if (!receipt || receipt.status !== 1) {
+    throw new OnchainOsError(
+      `Swap reverted on-chain (status=0, gasUsed=${receipt ? String(receipt.gasUsed) : '?'}, tx=${swapTx.hash}). ` +
+      `Likely cause: slippage exceeded or stale routing data. Try again.`,
+    );
+  }
+
+  const status: 'submitted' | 'confirmed' = 'confirmed';
+
+  try {
+    const gasFee = receipt.gasUsed * receipt.gasPrice;
+    recordGasSpend(Number(gasFee) / 1e18);
+  } catch (err) {
+    console.warn('[executeSwap] failed to record swap gas:', err instanceof Error ? err.message : err);
   }
   recordActivity('dex.swap', `${params.fromSymbol}->${params.toSymbol} ${swapTx.hash}`);
 
