@@ -234,7 +234,7 @@ export function EndpointCard({ method, path, price, description, params = [] }: 
           title="Send without payment — shows the 402 Payment Required gate"
           className="h-9 px-3 flex items-center gap-1.5 text-[11px] font-bold text-[#EF4444] bg-[rgba(239,68,68,0.08)] hover:bg-[rgba(239,68,68,0.15)] border border-[rgba(239,68,68,0.2)] rounded-lg transition-colors disabled:opacity-50 shrink-0"
         >
-          {probing ? '…' : '→ 402'}
+          {probing ? '…' : '402 gate'}
         </button>
         <button
           onClick={run}
