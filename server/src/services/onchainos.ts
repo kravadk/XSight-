@@ -145,7 +145,7 @@ export async function getWalletBalances(
     const price = Number(t.tokenPrice ?? 0);
     return {
       symbol: String(t.symbol ?? ''),
-      address: String(t.tokenAddress ?? ''),
+      address: String(t.tokenAddress ?? NATIVE_TOKEN_ADDRESS),
       amount,
       usdValue: amount * price,
     };
