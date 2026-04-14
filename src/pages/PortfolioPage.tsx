@@ -11,6 +11,7 @@ import { PortfolioHistoryChart } from '../components/portfolio/PortfolioHistoryC
 import { cn } from '../utils/format';
 import { useWalletStore } from '../store/walletStore';
 import { useUiStore } from '../store/uiStore';
+import { toast } from '../store/toastStore';
 
 type Sub = 'overview' | 'holdings' | 'history' | 'yield';
 
@@ -41,12 +42,7 @@ export function PortfolioPage() {
           </p>
         </div>
         <button
-          onClick={() => {
-            // trigger the TopBar connect modal via window event
-            window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', metaKey: true, ctrlKey: true }));
-            // fallback: open connect via TopBar click simulation — just navigate to portfolio which shows the connect prompt
-            document.querySelector<HTMLButtonElement>('[data-connect-btn]')?.click();
-          }}
+          onClick={() => toast.info('WalletConnect is not supported in this build')}
           className="h-12 px-8 rounded-xl bg-[#BFFF00] text-[#0A0A0A] font-bold text-sm hover:bg-[#D4FF33] transition-colors"
         >
           Connect Wallet

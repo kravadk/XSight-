@@ -28,9 +28,13 @@ function useCountdown(lastAt: number, intervalMs: number) {
 
 export function HeartbeatCard() {
   const [status, setStatus] = useState<HeartbeatStatus | null>(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    const load = () => api.heartbeat().then(setStatus).catch(() => {});
+    const load = () =>
+      api.heartbeat()
+        .then((s) => { setStatus(s); setError(false); })
+        .catch(() => setError(true));
     load();
     const id = setInterval(load, 30_000);
     return () => clearInterval(id);
@@ -66,7 +70,9 @@ export function HeartbeatCard() {
         </AnimatePresence>
       </div>
 
-      {status === null ? (
+      {status === null && error ? (
+        <div className="py-4 text-center text-[11px] text-[#555]">Heartbeat unavailable</div>
+      ) : status === null ? (
         <div className="skeleton h-16 rounded-xl" />
       ) : (
         <div className="grid grid-cols-3 gap-3">

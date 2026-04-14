@@ -292,10 +292,16 @@ chatRouter.post('/', async (req: Request, res: Response) => {
       appendMessages(msgs).catch((err) => console.error('[chat] history persist failed:', err instanceof Error ? err.message : err));
     }
 
-    // Auto-generate AI title for the first turn of a new session
+    // Auto-generate AI title for the first turn of a new session.
+    // Check session length BEFORE the fire-and-forget persist above completes —
+    // getSession() reads in-memory state which may not yet include the new msgs.
+    // So we check whether this is the first turn by reading BEFORE appending.
+    // Since appendToSession is async and not awaited, sess.messages.length here
+    // still reflects the pre-append count (0 or 1 for a brand-new session).
     if (sessionId) {
       const sess = await getSession(sessionId);
-      if (sess && sess.messages.length <= 2) {
+      const isFirstTurn = !sess || sess.messages.length === 0;
+      if (isFirstTurn) {
         generateSessionTitle(message).then(title => {
           if (title) return updateSessionTitle(sessionId, title);
         }).catch(() => {});

@@ -23,6 +23,7 @@ export function SwapWizard({ onClose }: Props) {
   const [amount, setAmount] = useState('100');
   const [quote, setQuote] = useState<SwapQuoteDto | null>(null);
   const [quoting, setQuoting] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { execute } = useSwap();
   const setActiveTab = useUiStore((s) => s.setActiveTab);
@@ -30,11 +31,13 @@ export function SwapWizard({ onClose }: Props) {
   // Bootstrap defaults from the catalog (USDT → OKB)
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([api.resolveToken('USDT'), api.resolveToken('OKB')]).then(([u, o]) => {
-      if (cancelled) return;
-      setFrom((prev) => prev ?? u);
-      setTo((prev) => prev ?? o);
-    });
+    Promise.all([api.resolveToken('USDT'), api.resolveToken('OKB')])
+      .then(([u, o]) => {
+        if (cancelled) return;
+        setFrom((prev) => prev ?? u);
+        setTo((prev) => prev ?? o);
+      })
+      .catch(() => { /* catalog unavailable — user can pick tokens manually */ });
     return () => {
       cancelled = true;
     };
@@ -48,15 +51,19 @@ export function SwapWizard({ onClose }: Props) {
       return;
     }
     setQuoting(true);
+    setQuoteError(null);
     const raw = BigInt(Math.round(num * 10 ** from.decimals)).toString();
     let cancelled = false;
     void api
       .swapQuote(from.address, to.address, raw)
       .then((q) => {
-        if (!cancelled) setQuote(q);
+        if (!cancelled) { setQuote(q); setQuoteError(null); }
       })
-      .catch(() => {
-        if (!cancelled) setQuote(null);
+      .catch((err) => {
+        if (!cancelled) {
+          setQuote(null);
+          setQuoteError(err instanceof Error ? err.message : 'Quote unavailable');
+        }
       })
       .finally(() => {
         if (!cancelled) setQuoting(false);
@@ -80,12 +87,14 @@ export function SwapWizard({ onClose }: Props) {
     setSubmitting(true);
     onClose();
     setActiveTab('chat');
-    const toAmountHuman = quote ? Number(quote.toAmount) / 10 ** to.decimals : 0;
+    // quote.toAmount is already human-readable (backend converts before sending)
+    const toAmountHuman = quote ? Number(quote.toAmount) : 0;
     await execute(from.address, to.address, num, toAmountHuman);
     setSubmitting(false);
   };
 
-  const toHuman = quote && to ? Number(quote.toAmount) / 10 ** to.decimals : 0;
+  // quote.toAmount is already human-readable — do NOT divide by decimals again
+  const toHuman = quote ? Number(quote.toAmount) : 0;
   const sameToken = from && to && from.address.toLowerCase() === to.address.toLowerCase();
 
   return (
@@ -227,6 +236,11 @@ export function SwapWizard({ onClose }: Props) {
             {step === 'Preview' && from && to && (
               <div className="flex flex-col gap-3">
                 <p className="text-xs text-[#A3A3A3]">Review the route before confirming.</p>
+                {quoteError && (
+                  <div className="px-3 py-2 rounded-lg bg-[rgba(239,68,68,0.08)] text-[#EF4444] text-[11px]">
+                    {quoteError}
+                  </div>
+                )}
                 <div className="bg-[#1A1A1A] rounded-xl p-4 border border-[rgba(255,255,255,0.06)] flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <TokenIcon symbol={from.symbol} size={28} />
